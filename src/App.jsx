@@ -47,8 +47,8 @@ import Layout from "./components/Layout";
 // ─────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────
-const API_BASE    = import.meta.env.VITE_API_URL || "http://localhost:5000";
-const SOCKET_URL  = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_BASE   = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const SOCKET_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 // ─────────────────────────────────────────────
 // Blocked App Context
@@ -62,8 +62,6 @@ export const useBlockedApps = () => useContext(BlockedAppContext);
 function BlockedAppProvider({ children }) {
   const { token, role } = useAuth();
 
-  // ✅ useRef bhi rakho taake BlockGuard ko fresh list mile
-  // bina re-render wait kiye (stale closure fix)
   const [blockedApps, setBlockedApps] = useState([]);
   const blockedAppsRef = useRef([]);
 
@@ -72,7 +70,6 @@ function BlockedAppProvider({ children }) {
   });
   const [loading, setLoading] = useState(true);
 
-  // State aur ref dono saath update karo
   const updateBlockedApps = useCallback((list) => {
     blockedAppsRef.current = list;
     setBlockedApps(list);
@@ -115,7 +112,7 @@ function BlockedAppProvider({ children }) {
     fetchStats();
   }, [fetchApps, fetchStats, token]);
 
-  // ✅ Socket — real-time updates
+  // ─── Socket — real-time updates ───────────────────────────────────────
   useEffect(() => {
     if (!token) return;
 
@@ -133,21 +130,48 @@ function BlockedAppProvider({ children }) {
       console.error("❌ Socket error:", err.message);
     });
 
+    // Admin dashboard ke liye — full list update
     socket.on("blocked_apps_updated", (list) => {
-      console.log("🔄 blocked_apps_updated received:", list.length, "items");
-      // Ref aur state dono update karo
+      console.log("🔄 blocked_apps_updated:", list.length, "items");
       updateBlockedApps(list);
-
       const active   = list.filter((a) => a.isBlocked).length;
       const websites = list.filter((a) => a.isBlocked && a.type === "website").length;
       const internal = list.filter((a) => a.isBlocked && a.type === "internal").length;
       setStats({ total: list.length, active, websites, internal });
     });
 
+    // ✅ FIX 1: Browser/mobile/tablet ke liye — domains + routes directly aate hain
+    // Controller iska emit karta hai har block/unblock/delete pe
+    socket.on("browser:blockedList", ({ domains, routes }) => {
+      console.log("🔄 browser:blockedList:", domains.length, "domains,", routes.length, "routes");
+
+      // Existing list ke saath merge karo — type preserve karo
+      // Naye blocked domains se blockedApps list update karo
+      const updated = blockedAppsRef.current.map((app) => {
+        if (app.type === "website") {
+          // Agar domain list mein hai → blocked, nahi hai → unblocked
+          const isNowBlocked = domains.includes(app.identifier);
+          return { ...app, isBlocked: isNowBlocked };
+        }
+        if (app.type === "internal") {
+          const isNowBlocked = routes.includes(app.identifier);
+          return { ...app, isBlocked: isNowBlocked };
+        }
+        return app;
+      });
+
+      updateBlockedApps(updated);
+
+      const active   = updated.filter((a) => a.isBlocked).length;
+      const websites = updated.filter((a) => a.isBlocked && a.type === "website").length;
+      const internal = updated.filter((a) => a.isBlocked && a.type === "internal").length;
+      setStats({ total: updated.length, active, websites, internal });
+    });
+
     return () => socket.disconnect();
   }, [token, role, updateBlockedApps]);
 
-  // ─── CRUD — socket update aayega automatically, manual refetch backup hai ───
+  // ─── CRUD ─────────────────────────────────────────────────────────────
   const addApp = async (data) => {
     const res = await api().post("/api/blocked-apps", data);
     await fetchApps(); await fetchStats();
@@ -171,12 +195,6 @@ function BlockedAppProvider({ children }) {
     await fetchApps(); await fetchStats();
   };
 
-  // ✅ checkIsBlocked — ref use karo (stale state se bachao)
-  // Internal route: "/employee/screenshots" → startsWith check
-  // Website: "youtube.com" → SIRF internal route name ke liye nahi,
-  //          website type ka matlab hai baad mein kisi external tab blocker ke liye
-  //          Abhi ke liye website type ka koi React route pe effect nahi hoga
-  //          (kyunki React SPA mein hostname change nahi hota)
   const checkIsBlocked = useCallback((pathOrIdentifier) => {
     return blockedAppsRef.current.some(
       (a) =>
@@ -274,22 +292,15 @@ function BlockScreen({ app }) {
 }
 
 // ─────────────────────────────────────────────
-// BlockGuard — production-ready implementation
-//
-// WHY THIS APPROACH:
-// 1. useEffect + location dependency — har navigation pe re-check hota hai
-// 2. blockedAppsRef use karta hai — stale closure se bacha hai
-// 3. Admin role pehle check hota hai — admin kabhi block nahi hoga
-// 4. Loading state handle hai — flicker nahi hoga
+// BlockGuard
 // ─────────────────────────────────────────────
 function BlockGuard({ children }) {
   const { role } = useAuth();
   const { blockedAppsRef, loading, blockedApps } = useBlockedApps();
   const location = useLocation();
 
-  // ✅ Blocked app dhundo — ref use karo (fresh data)
   const getBlockedApp = useCallback(() => {
-    // Admin = kabhi block nahi
+    // Admin kabhi block nahi hoga
     if (role === "admin") return null;
 
     const currentPath = location.pathname;
@@ -298,48 +309,56 @@ function BlockGuard({ children }) {
     return list.find((app) => {
       if (!app.isBlocked) return false;
 
-      // Internal route blocking — e.g. identifier: "/employee/screenshots"
       if (app.type === "internal") {
+        // ✅ Exact startsWith — "/employee/screenshots" → block
         return currentPath.startsWith(app.identifier);
       }
 
-      // Website domain blocking — e.g. identifier: "youtube.com"
-      // Note: React SPA mein hostname localhost hoga isliye
-      // website type ko route path se match karein
-      // (agar identifier route naam se match kare — e.g. "screenshots", "activity")
       if (app.type === "website") {
-        // Pehle hostname check karo (agar actual site pe ho)
-        const hostnameMatch = window.location.hostname
-          .toLowerCase()
-          .includes(app.identifier.toLowerCase());
-        if (hostnameMatch) return true;
+        // ✅ FIX 2: Website type ke liye 3 cheezein check karo:
 
-        // Phir path check karo (internal app mein website type ke liye)
-        return currentPath.toLowerCase().includes(
-          app.identifier.toLowerCase().replace(/^https?:\/\//, "").split("/")[0]
-        );
+        // 1. Actual hostname — agar employee kisi aur device se actual site pe gaya
+        //    e.g. youtube.com pe open kiya
+        const cleanIdentifier = app.identifier.toLowerCase().replace(/^www\./, "");
+        const currentHostname = window.location.hostname.toLowerCase().replace(/^www\./, "");
+        if (currentHostname === cleanIdentifier || currentHostname.endsWith(`.${cleanIdentifier}`)) {
+          return true;
+        }
+
+        // 2. Route path mein identifier match — agar koi /youtube ya /youtube.com route ban jaye
+        //    (future-proof, abhi kaam nahi aata lekin edge case cover karta hai)
+        if (currentPath.toLowerCase().includes(cleanIdentifier.split(".")[0])) {
+          // Sirf agar identifier genuinely route se milta ho
+          // Bahut short identifiers (2 char se kam) ko skip karo — false positives
+          const keyword = cleanIdentifier.split(".")[0];
+          if (keyword.length > 3 && currentPath.toLowerCase().includes(`/${keyword}`)) {
+            return true;
+          }
+        }
+
+        // 3. ✅ MOBILE/TABLET KEY FIX:
+        // Agar app localhost pe nahi chal raha (production deploy) toh
+        // referrer ya current URL se domain match karo
+        const fullUrl = window.location.href.toLowerCase();
+        if (fullUrl.includes(cleanIdentifier)) return true;
+
+        return false;
       }
 
       return false;
     }) || null;
   }, [role, location.pathname, blockedAppsRef]);
 
-  // ✅ State mein blocked app rakho taake re-render properly ho
   const [blockedApp, setBlockedApp] = useState(null);
 
-  // ✅ Location change hone par aur blockedApps update hone par re-check karo
   useEffect(() => {
     if (loading) return;
     const found = getBlockedApp();
     setBlockedApp(found);
   }, [location.pathname, blockedApps, loading, getBlockedApp]);
 
-  // Loading mein kuch mat dikhao (flicker bachao)
   if (loading) return children;
-
-  // Blocked screen dikhao
   if (blockedApp) return <BlockScreen app={blockedApp} />;
-
   return children;
 }
 
@@ -352,8 +371,7 @@ function RoleRedirect() {
 }
 
 // ─────────────────────────────────────────────
-// AppRoutes — BlockGuard Router ke ANDAR hai
-// (useLocation Router ke bahar kaam nahi karta)
+// AppRoutes
 // ─────────────────────────────────────────────
 function AppRoutes() {
   return (
@@ -380,13 +398,13 @@ function AppRoutes() {
         <Route path="/admin/settings"         element={<AuthGuard role="admin"><Layout><SystemSettings /></Layout></AuthGuard>} />
 
         {/* ─── EMPLOYEE ─── */}
-        <Route path="/employee/dashboard"  element={<AuthGuard role="employee"><Layout><MyDashboard /></Layout></AuthGuard>} />
-        <Route path="/employee/tasks"      element={<AuthGuard role="employee"><Layout><EmployeeTasks /></Layout></AuthGuard>} />
-        <Route path="/employee/activity"   element={<AuthGuard role="employee"><Layout><ActivityLog /></Layout></AuthGuard>} />
+        <Route path="/employee/dashboard"   element={<AuthGuard role="employee"><Layout><MyDashboard /></Layout></AuthGuard>} />
+        <Route path="/employee/tasks"       element={<AuthGuard role="employee"><Layout><EmployeeTasks /></Layout></AuthGuard>} />
+        <Route path="/employee/activity"    element={<AuthGuard role="employee"><Layout><ActivityLog /></Layout></AuthGuard>} />
         <Route path="/employee/screenshots" element={<AuthGuard role="employee"><Layout><MyScreenshots /></Layout></AuthGuard>} />
-        <Route path="/employee/hours"      element={<AuthGuard role="employee"><Layout><WorkHours /></Layout></AuthGuard>} />
-        <Route path="/employee/profile"    element={<AuthGuard role="employee"><Layout><MyProfile /></Layout></AuthGuard>} />
-        <Route path="/employee/privacy"    element={<AuthGuard role="employee"><Layout><PrivacySettings /></Layout></AuthGuard>} />
+        <Route path="/employee/hours"       element={<AuthGuard role="employee"><Layout><WorkHours /></Layout></AuthGuard>} />
+        <Route path="/employee/profile"     element={<AuthGuard role="employee"><Layout><MyProfile /></Layout></AuthGuard>} />
+        <Route path="/employee/privacy"     element={<AuthGuard role="employee"><Layout><PrivacySettings /></Layout></AuthGuard>} />
 
         {/* LEGACY */}
         <Route path="/admin/dashboard" element={<Navigate to="/hr-dashboard" replace />} />
@@ -400,13 +418,7 @@ function AppRoutes() {
 }
 
 // ─────────────────────────────────────────────
-// App — Provider order:
-// AuthProvider (token/role source)
-//   └─ PrivacyProvider
-//       └─ BlockedAppProvider (token consume karta hai)
-//           └─ Router
-//               └─ AppRoutes (useLocation yahan kaam karta hai)
-//                   └─ BlockGuard
+// App
 // ─────────────────────────────────────────────
 function App() {
   return (
