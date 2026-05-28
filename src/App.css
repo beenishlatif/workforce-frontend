@@ -1,0 +1,52 @@
+@import "tailwindcss";
+@media (max-width: 768px) {
+
+  * {
+    max-width: 100%;
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+
+  .flex-row {
+    flex-direction: column !important;
+  }
+
+  .grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  [class*="w-["] {
+    width: 100% !important;
+  }
+
+  [class*="max-w-["] {
+    max-width: 100% !important;
+  }
+
+  .p-10,
+  .p-12,
+  .px-10,
+  .px-12 {
+    padding: 1rem !important;
+  }
+
+  .text-5xl,
+  .text-6xl {
+    font-size: 2rem !important;
+    line-height: 1.2 !important;
+  }
+
+  table {
+    display: block;
+    overflow-x: auto;
+    width: 100%;
+  }
+
+  img,
+  video {
+    max-width: 100%;
+    height: auto;
+  }
+}
