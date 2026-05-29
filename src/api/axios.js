@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "https://workforce-backend-dusky.vercel.app/api",
+  baseURL: "https://workforce-backend-production-cc13.up.railway.app/api",
   headers: { "Content-Type": "application/json" },
   withCredentials: true,
 });
