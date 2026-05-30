@@ -365,23 +365,25 @@ export default function EmployeeTasks() {
     setTimeout(()=>setToast(t=>({...t,show:false})), 2800);
   }, []);
 
+  // ✅ FIX: /emp/tasks use karo — sirf logged-in employee ki tasks aati hain
+  // Backend { tasks, stats } object return karta hai, isliye data.tasks unwrap karo
   const loadTasks = useCallback(async(silent=false) => {
     if (!silent) setLoading(true);
     try {
-      let data;
-      try { data = await apiCall("/tasks"); } catch {}
-      if (!Array.isArray(data)) {
-        const all = await apiCall("/tasks");
-        const token  = localStorage.getItem("token");
-        const userId = token ? JSON.parse(atob(token.split(".")[1]))?.id : null;
-        data = Array.isArray(all)
-          ? all.filter(t => String(t.assigned_to?._id??t.assigned_to??"") === String(userId))
+      const data = await apiCall("/emp/tasks");
+
+      // Backend returns { tasks: [...], stats: {...} }
+      const taskList = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.tasks)
+          ? data.tasks
           : [];
-      }
-      setTasks(data);
+
+      setTasks(taskList);
+
       // Auto-select first active task
-      if (!selected && data.length > 0) {
-        const active = data.find(t=>t.status==="in_progress") || data[0];
+      if (!selected && taskList.length > 0) {
+        const active = taskList.find(t=>t.status==="in_progress") || taskList[0];
         setSelected(getTaskId(active));
       }
     } catch(e) {
@@ -416,12 +418,13 @@ export default function EmployeeTasks() {
     return()=>sock.disconnect();
   },[toast$, selected]);
 
+  // ✅ FIX: /emp/tasks/:id/status use karo
   async function updateStatus(id, newStatus) {
     if (updating) return;
     setUpdating(id);
     setTasks(prev=>prev.map(t=>getTaskId(t)===id?{...t,status:newStatus}:t));
     try {
-      await apiCall(`/tasks/${id}/status`,"PATCH",{ status:newStatus });
+      await apiCall(`/emp/tasks/${id}/status`, "PATCH", { status: newStatus });
       const labels = { completed:"✓ Task complete!",in_progress:"▶ Task shuru",in_review:"👁 Review bheja",pending:"Task pending" };
       toast$(labels[newStatus]||"Status update ho gaya");
     } catch(e) {
