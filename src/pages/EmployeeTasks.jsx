@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { io as socketIO } from "socket.io-client";
 
 const API_BASE   = "https://workforce-backend-production-cc13.up.railway.app/api";
@@ -45,7 +45,6 @@ function isOverdue(due, status) {
 }
 function getTaskId(t) { return String(t?._id ?? t?.id ?? ""); }
 
-// ── Mini circular progress ──
 function CircleProgress({ pct, size=48, stroke=4, color="#818cf8" }) {
   const r = (size-stroke*2)/2;
   const circ = 2*Math.PI*r;
@@ -63,7 +62,6 @@ function CircleProgress({ pct, size=48, stroke=4, color="#818cf8" }) {
   );
 }
 
-// ── Toast ──
 function Toast({ msg, type, show }) {
   return (
     <div style={{
@@ -85,13 +83,10 @@ function Toast({ msg, type, show }) {
   );
 }
 
-// ── Task Card ──
 function TaskCard({ task, onUpdate, updating, isSelected, onClick }) {
-  const id   = getTaskId(task);
-  const st   = STATUS[task.status]   || STATUS.pending;
+  const st   = STATUS[task.status]     || STATUS.pending;
   const pr   = PRIORITY[task.priority] || PRIORITY.medium;
   const over = isOverdue(task.due_date, task.status);
-  const busy = updating === id;
 
   return (
     <div onClick={onClick}
@@ -109,27 +104,22 @@ function TaskCard({ task, onUpdate, updating, isSelected, onClick }) {
       }}
       onMouseEnter={e=>{ if(!isSelected){e.currentTarget.style.background="rgba(255,255,255,0.04)"; e.currentTarget.style.borderColor="rgba(255,255,255,0.1)";} }}
       onMouseLeave={e=>{ if(!isSelected){e.currentTarget.style.background="rgba(255,255,255,0.02)"; e.currentTarget.style.borderColor="rgba(255,255,255,0.06)";} }}>
-
       <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:10 }}>
         <div style={{ flex:1, minWidth:0 }}>
           <div style={{ fontSize:12, fontWeight:700, color:"#e8eaf6",
-            overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
-            marginBottom:6 }}>
+            overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", marginBottom:6 }}>
             {task.title}
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" }}>
             <span style={{ fontSize:9, fontWeight:700, padding:"2px 8px", borderRadius:20,
               background:st.bg, color:st.color, border:`1px solid ${st.border}`,
               display:"inline-flex", alignItems:"center", gap:4, letterSpacing:".04em" }}>
-              {task.status==="in_progress"&&(
-                <span style={{ width:4, height:4, borderRadius:"50%", background:st.color,
-                  animation:"pulse 1.5s infinite" }}/>
+              {task.status==="in_progress" && (
+                <span style={{ width:4, height:4, borderRadius:"50%", background:st.color, animation:"pulse 1.5s infinite" }}/>
               )}
               {st.label}
             </span>
-            <span style={{ fontSize:10, color:pr.color, fontWeight:600 }}>
-              {pr.icon} {pr.label}
-            </span>
+            <span style={{ fontSize:10, color:pr.color, fontWeight:600 }}>{pr.icon} {pr.label}</span>
           </div>
         </div>
         {task.due_date && (
@@ -143,24 +133,22 @@ function TaskCard({ task, onUpdate, updating, isSelected, onClick }) {
   );
 }
 
-// ── Task Detail Panel ──
 function TaskDetail({ task, onUpdate, updating }) {
   const id   = getTaskId(task);
-  const st   = STATUS[task.status]   || STATUS.pending;
+  const st   = STATUS[task.status]     || STATUS.pending;
   const pr   = PRIORITY[task.priority] || PRIORITY.medium;
   const over = isOverdue(task.due_date, task.status);
   const busy = updating === id;
 
   const pct = task.status==="completed" ? 100
     : task.status==="in_progress" ? task.progress||55
-    : task.status==="in_review" ? 80
-    : task.status==="blocked" ? 20 : 0;
+    : task.status==="in_review"   ? 80
+    : task.status==="blocked"     ? 20 : 0;
 
   function Actions() {
     if (task.status==="completed") return (
       <div style={{ display:"flex", alignItems:"center", gap:10, padding:"14px 16px",
-        background:"rgba(52,211,153,0.06)", border:"1px solid rgba(52,211,153,0.2)",
-        borderRadius:12 }}>
+        background:"rgba(52,211,153,0.06)", border:"1px solid rgba(52,211,153,0.2)", borderRadius:12 }}>
         <div style={{ width:32, height:32, borderRadius:"50%", background:"rgba(52,211,153,0.15)",
           display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>✓</div>
         <div>
@@ -171,11 +159,9 @@ function TaskDetail({ task, onUpdate, updating }) {
         </div>
       </div>
     );
-
     if (task.status==="in_review") return (
       <div style={{ display:"flex", alignItems:"center", gap:10, padding:"14px 16px",
-        background:"rgba(167,139,250,0.06)", border:"1px solid rgba(167,139,250,0.2)",
-        borderRadius:12 }}>
+        background:"rgba(167,139,250,0.06)", border:"1px solid rgba(167,139,250,0.2)", borderRadius:12 }}>
         <div style={{ width:32, height:32, borderRadius:"50%", background:"rgba(167,139,250,0.15)",
           display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>⏳</div>
         <div>
@@ -184,13 +170,12 @@ function TaskDetail({ task, onUpdate, updating }) {
         </div>
       </div>
     );
-
     if (task.status==="blocked") return (
-      <button onClick={()=>onUpdate(id,"in_progress")} disabled={busy} style={btnS("#818cf8","rgba(129,140,248,.1)","rgba(129,140,248,.25)")}>
+      <button onClick={()=>onUpdate(id,"in_progress")} disabled={busy}
+        style={btnS("#818cf8","rgba(129,140,248,.1)","rgba(129,140,248,.25)")}>
         {busy?"...":"▶  Resume Karo"}
       </button>
     );
-
     if (task.status==="in_progress") return (
       <div style={{ display:"flex", gap:10 }}>
         <button onClick={()=>onUpdate(id,"in_review")} disabled={busy}
@@ -203,41 +188,33 @@ function TaskDetail({ task, onUpdate, updating }) {
         </button>
       </div>
     );
-
     return (
-      <button onClick={()=>onUpdate(id,"in_progress")} disabled={busy} style={btnS("#818cf8","rgba(129,140,248,.1)","rgba(129,140,248,.25)")}>
+      <button onClick={()=>onUpdate(id,"in_progress")} disabled={busy}
+        style={btnS("#818cf8","rgba(129,140,248,.1)","rgba(129,140,248,.25)")}>
         {busy?"...":"▶  Shuru Karo"}
       </button>
     );
   }
 
   return (
-    <div style={{ height:"100%", display:"flex", flexDirection:"column", gap:20,
-      animation:"fadeUp .3s ease" }}>
-
-      {/* Header */}
+    <div style={{ height:"100%", display:"flex", flexDirection:"column", gap:20, animation:"fadeUp .3s ease" }}>
       <div style={{ padding:"24px 28px 0" }}>
-        <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between",
-          gap:16, marginBottom:20 }}>
+        <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:16, marginBottom:20 }}>
           <div style={{ flex:1 }}>
             <div style={{ fontSize:9, fontWeight:700, color:"rgba(255,255,255,0.25)",
               textTransform:"uppercase", letterSpacing:".1em", marginBottom:8 }}>Task Details</div>
-            <div style={{ fontSize:20, fontWeight:800, color:"#f0f0f2",
-              lineHeight:1.3, letterSpacing:"-0.02em" }}>
+            <div style={{ fontSize:20, fontWeight:800, color:"#f0f0f2", lineHeight:1.3, letterSpacing:"-0.02em" }}>
               {task.title}
             </div>
           </div>
           <CircleProgress pct={pct} size={52} stroke={4} color={st.color}/>
         </div>
-
-        {/* Status + Priority row */}
         <div style={{ display:"flex", gap:8, marginBottom:4 }}>
           <span style={{ fontSize:10, fontWeight:700, padding:"4px 12px", borderRadius:20,
             background:st.bg, color:st.color, border:`1px solid ${st.border}`,
             display:"inline-flex", alignItems:"center", gap:5 }}>
-            {task.status==="in_progress"&&(
-              <span style={{ width:5, height:5, borderRadius:"50%", background:st.color,
-                animation:"pulse 1.5s infinite" }}/>
+            {task.status==="in_progress" && (
+              <span style={{ width:5, height:5, borderRadius:"50%", background:st.color, animation:"pulse 1.5s infinite" }}/>
             )}
             {st.label}
           </span>
@@ -248,14 +225,9 @@ function TaskDetail({ task, onUpdate, updating }) {
         </div>
       </div>
 
-      {/* Divider */}
       <div style={{ height:1, background:"rgba(255,255,255,0.06)", marginLeft:28, marginRight:28 }}/>
 
-      {/* Body */}
-      <div style={{ flex:1, overflowY:"auto", padding:"0 28px",
-        display:"flex", flexDirection:"column", gap:18 }}>
-
-        {/* Description */}
+      <div style={{ flex:1, overflowY:"auto", padding:"0 28px", display:"flex", flexDirection:"column", gap:18 }}>
         {task.description && (
           <div>
             <div style={{ fontSize:9, fontWeight:700, color:"rgba(255,255,255,0.25)",
@@ -268,7 +240,6 @@ function TaskDetail({ task, onUpdate, updating }) {
           </div>
         )}
 
-        {/* Progress bar */}
         <div>
           <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8 }}>
             <div style={{ fontSize:9, fontWeight:700, color:"rgba(255,255,255,0.25)",
@@ -283,15 +254,14 @@ function TaskDetail({ task, onUpdate, updating }) {
           </div>
         </div>
 
-        {/* Meta info */}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
           {[
-            { label:"Due Date",   val:task.due_date ? fmtDate(task.due_date) : "No deadline",
+            { label:"Due Date", val:task.due_date ? fmtDate(task.due_date) : "No deadline",
               color:over?"#f87171":"rgba(255,255,255,0.5)", icon:"📅" },
-            { label:"Priority",   val:pr.label, color:pr.color, icon:pr.icon },
-            { label:"Created",    val:task.createdAt ? fmtDate(task.createdAt) : "—",
+            { label:"Priority", val:pr.label, color:pr.color, icon:pr.icon },
+            { label:"Created",  val:task.createdAt ? fmtDate(task.createdAt) : "—",
               color:"rgba(255,255,255,0.4)", icon:"🕐" },
-            { label:"Status",     val:st.label, color:st.color, icon:"●" },
+            { label:"Status",   val:st.label, color:st.color, icon:"●" },
           ].map(m=>(
             <div key={m.label} style={{ background:"rgba(255,255,255,0.02)",
               border:"1px solid rgba(255,255,255,0.06)", borderRadius:10, padding:"12px 14px" }}>
@@ -305,7 +275,6 @@ function TaskDetail({ task, onUpdate, updating }) {
           ))}
         </div>
 
-        {/* Started/Completed timestamps */}
         {(task.startedAt || task.completedAt) && (
           <div style={{ display:"flex", gap:10 }}>
             {task.startedAt && (
@@ -313,9 +282,7 @@ function TaskDetail({ task, onUpdate, updating }) {
                 border:"1px solid rgba(129,140,248,0.15)", borderRadius:10, padding:"10px 14px" }}>
                 <div style={{ fontSize:9, color:"rgba(129,140,248,0.5)", textTransform:"uppercase",
                   letterSpacing:".08em", marginBottom:4 }}>Started</div>
-                <div style={{ fontSize:12, fontWeight:600, color:"#818cf8" }}>
-                  {fmtDate(task.startedAt)}
-                </div>
+                <div style={{ fontSize:12, fontWeight:600, color:"#818cf8" }}>{fmtDate(task.startedAt)}</div>
               </div>
             )}
             {task.completedAt && (
@@ -323,16 +290,13 @@ function TaskDetail({ task, onUpdate, updating }) {
                 border:"1px solid rgba(52,211,153,0.15)", borderRadius:10, padding:"10px 14px" }}>
                 <div style={{ fontSize:9, color:"rgba(52,211,153,0.5)", textTransform:"uppercase",
                   letterSpacing:".08em", marginBottom:4 }}>Completed</div>
-                <div style={{ fontSize:12, fontWeight:600, color:"#34d399" }}>
-                  {fmtDate(task.completedAt)}
-                </div>
+                <div style={{ fontSize:12, fontWeight:600, color:"#34d399" }}>{fmtDate(task.completedAt)}</div>
               </div>
             )}
           </div>
         )}
       </div>
 
-      {/* Actions footer */}
       <div style={{ padding:"0 28px 28px" }}>
         <Actions/>
       </div>
@@ -360,19 +324,24 @@ export default function EmployeeTasks() {
   const [selected, setSelected] = useState(null);
   const [toast,    setToast]    = useState({ show:false, msg:"", type:"success" });
 
+  // ✅ FIX 1: selected ko ref mein track karo
+  // taake loadTasks mein selected dependency na ho aur infinite loop na bane
+  const selectedRef = useRef(null);
+  selectedRef.current = selected;
+
   const toast$ = useCallback((msg, type="success") => {
     setToast({ show:true, msg, type });
     setTimeout(()=>setToast(t=>({...t,show:false})), 2800);
   }, []);
 
-  // ✅ FIX: /emp/tasks use karo — sirf logged-in employee ki tasks aati hain
-  // Backend { tasks, stats } object return karta hai, isliye data.tasks unwrap karo
-  const loadTasks = useCallback(async(silent=false) => {
+  // ✅ FIX 2: selected dependency hatao — toast$ sirf ek baar banta hai
+  // /emp/tasks — server req.user._id se filter karta hai, client ko kuch nahi karna
+  const loadTasks = useCallback(async (silent=false) => {
     if (!silent) setLoading(true);
     try {
       const data = await apiCall("/emp/tasks");
 
-      // Backend returns { tasks: [...], stats: {...} }
+      // Controller { tasks: [...], stats: {...} return karta hai
       const taskList = Array.isArray(data)
         ? data
         : Array.isArray(data?.tasks)
@@ -381,83 +350,94 @@ export default function EmployeeTasks() {
 
       setTasks(taskList);
 
-      // Auto-select first active task
-      if (!selected && taskList.length > 0) {
-        const active = taskList.find(t=>t.status==="in_progress") || taskList[0];
+      // ✅ FIX 3: ref se check karo — state se nahi
+      if (!selectedRef.current && taskList.length > 0) {
+        const active = taskList.find(t => t.status === "in_progress") || taskList[0];
         setSelected(getTaskId(active));
       }
-    } catch(e) {
+    } catch (e) {
       if (!silent) toast$("Tasks load nahi hue", "error");
     }
     setLoading(false);
-  }, [toast$, selected]);
+  }, [toast$]); // ← selected nahi hai yahan, isliye loadTasks stable rahega
 
-  useEffect(()=>{ loadTasks(); },[loadTasks]);
-  useEffect(()=>{ const id=setInterval(()=>loadTasks(true),15000); return()=>clearInterval(id); },[loadTasks]);
+  useEffect(() => { loadTasks(); }, [loadTasks]);
+  useEffect(() => {
+    const id = setInterval(() => loadTasks(true), 15000);
+    return () => clearInterval(id);
+  }, [loadTasks]);
 
   // Socket
-  useEffect(()=>{
-    const sock = socketIO(SOCKET_URL,{ transports:["websocket","polling"], reconnection:true });
+  useEffect(() => {
+    const sock = socketIO(SOCKET_URL, { transports:["websocket","polling"], reconnection:true });
     const token  = localStorage.getItem("token");
     const userId = token ? JSON.parse(atob(token.split(".")[1]))?.id : null;
-    sock.on("connect",()=>{ if(userId) sock.emit("join",`emp_${userId}`); });
-    sock.on("task:update", u=>{
-      setTasks(p=>p.map(t=>getTaskId(t)===String(u._id??u.taskId)?{...t,...u}:t));
+
+    sock.on("connect", () => { if (userId) sock.emit("join", `emp_${userId}`); });
+
+    sock.on("task:update", u => {
+      setTasks(p => p.map(t => getTaskId(t) === String(u._id ?? u.taskId) ? {...t, ...u} : t));
     });
-    sock.on("task:new", nt=>{
-      setTasks(p=>{
-        if(p.find(t=>getTaskId(t)===getTaskId(nt))) return p;
+
+    sock.on("task:new", nt => {
+      setTasks(p => {
+        if (p.find(t => getTaskId(t) === getTaskId(nt))) return p;
         toast$("📋 Naya task assign hua!");
         return [...p, nt];
       });
     });
-    sock.on("task:deleted",({taskId})=>{
-      setTasks(p=>p.filter(t=>getTaskId(t)!==String(taskId)));
-      if(selected===String(taskId)) setSelected(null);
-    });
-    return()=>sock.disconnect();
-  },[toast$, selected]);
 
-  // ✅ FIX: /emp/tasks/:id/status use karo
+    // ✅ FIX 4: selectedRef use karo socket mein bhi
+    sock.on("task:deleted", ({ taskId }) => {
+      setTasks(p => p.filter(t => getTaskId(t) !== String(taskId)));
+      if (selectedRef.current === String(taskId)) setSelected(null);
+    });
+
+    return () => sock.disconnect();
+  }, [toast$]); // ← selected nahi, selectedRef use karo
+
   async function updateStatus(id, newStatus) {
     if (updating) return;
     setUpdating(id);
-    setTasks(prev=>prev.map(t=>getTaskId(t)===id?{...t,status:newStatus}:t));
+    setTasks(prev => prev.map(t => getTaskId(t) === id ? {...t, status:newStatus} : t));
     try {
       await apiCall(`/emp/tasks/${id}/status`, "PATCH", { status: newStatus });
-      const labels = { completed:"✓ Task complete!",in_progress:"▶ Task shuru",in_review:"👁 Review bheja",pending:"Task pending" };
-      toast$(labels[newStatus]||"Status update ho gaya");
-    } catch(e) {
+      const labels = {
+        completed:"✓ Task complete!", in_progress:"▶ Task shuru",
+        in_review:"👁 Review bheja",  pending:"Task pending",
+      };
+      toast$(labels[newStatus] || "Status update ho gaya");
+    } catch (e) {
       loadTasks(true);
-      toast$("Update fail: "+e.message,"error");
+      toast$("Update fail: " + e.message, "error");
     }
     setUpdating(null);
   }
 
-  const cnt = s => tasks.filter(t=>t.status===s).length;
-  const pct = tasks.length ? Math.round(cnt("completed")/tasks.length*100) : 0;
+  const cnt = s => tasks.filter(t => t.status === s).length;
+  const pct = tasks.length ? Math.round(cnt("completed") / tasks.length * 100) : 0;
 
   const FILTERS = [
-    { k:"all",      l:"All",         n:tasks.length         },
-    { k:"active",   l:"Active",      n:cnt("in_progress")   },
-    { k:"pending",  l:"Pending",     n:cnt("pending")       },
-    { k:"review",   l:"In Review",   n:cnt("in_review")     },
-    { k:"done",     l:"Done",        n:cnt("completed")     },
-    { k:"blocked",  l:"Blocked",     n:cnt("blocked")       },
+    { k:"all",     l:"All",       n:tasks.length       },
+    { k:"active",  l:"Active",    n:cnt("in_progress") },
+    { k:"pending", l:"Pending",   n:cnt("pending")     },
+    { k:"review",  l:"In Review", n:cnt("in_review")   },
+    { k:"done",    l:"Done",      n:cnt("completed")   },
+    { k:"blocked", l:"Blocked",   n:cnt("blocked")     },
   ];
 
-  const filtered = tasks.filter(t=>{
-    if (filter==="all")    return true;
-    if (filter==="active") return t.status==="in_progress";
-    if (filter==="done")   return t.status==="completed";
-    if (filter==="review") return t.status==="in_review";
-    return t.status===filter;
-  }).sort((a,b)=>{
-    const o={in_progress:0,pending:1,in_review:2,blocked:3,completed:4};
-    return (o[a.status]??5)-(o[b.status]??5);
+  const filtered = tasks.filter(t => {
+    if (filter === "all")    return true;
+    if (filter === "active") return t.status === "in_progress";
+    if (filter === "done")   return t.status === "completed";
+    if (filter === "review") return t.status === "in_review";
+    return t.status === filter;
+  }).sort((a, b) => {
+    const o = { in_progress:0, pending:1, in_review:2, blocked:3, completed:4 };
+    return (o[a.status] ?? 5) - (o[b.status] ?? 5);
   });
 
-  const selectedTask = tasks.find(t=>getTaskId(t)===selected);
+  const selectedTask = tasks.find(t => getTaskId(t) === selected);
 
   return (
     <div style={{ background:"#080a0f", minHeight:"100vh", fontFamily:"'DM Sans',sans-serif",
@@ -466,14 +446,14 @@ export default function EmployeeTasks() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap');
         * { box-sizing:border-box; margin:0; padding:0; }
-        @keyframes fadeUp  { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes pulse   { 0%,100%{opacity:1} 50%{opacity:.3} }
-        @keyframes spin    { to{transform:rotate(360deg)} }
+        @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes pulse  { 0%,100%{opacity:1} 50%{opacity:.3} }
+        @keyframes spin   { to{transform:rotate(360deg)} }
         ::-webkit-scrollbar { width:3px; }
         ::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.08); border-radius:4px; }
       `}</style>
 
-      {/* ── Top bar ── */}
+      {/* Top bar */}
       <div style={{ padding:"20px 28px 0", display:"flex", alignItems:"center",
         justifyContent:"space-between", flexWrap:"wrap", gap:12 }}>
         <div>
@@ -486,15 +466,14 @@ export default function EmployeeTasks() {
             {tasks.length} tasks · auto-refresh 15s
           </div>
         </div>
-
-        {/* Overall progress */}
         <div style={{ display:"flex", alignItems:"center", gap:16,
           background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)",
           borderRadius:14, padding:"12px 20px" }}>
           <div style={{ textAlign:"right" }}>
             <div style={{ fontSize:9, color:"rgba(255,255,255,0.3)", textTransform:"uppercase",
               letterSpacing:".08em", marginBottom:3 }}>Completion</div>
-            <div style={{ fontSize:22, fontWeight:800, color:pct>=70?"#34d399":pct>=40?"#f5a623":"#f87171",
+            <div style={{ fontSize:22, fontWeight:800,
+              color:pct>=70?"#34d399":pct>=40?"#f5a623":"#f87171",
               fontFamily:"'DM Mono',monospace" }}>{pct}%</div>
           </div>
           <CircleProgress pct={pct} size={44} stroke={4}
@@ -502,29 +481,28 @@ export default function EmployeeTasks() {
         </div>
       </div>
 
-      {/* ── Stat pills ── */}
+      {/* Stat pills */}
       <div style={{ display:"flex", gap:8, padding:"16px 28px 0", flexWrap:"wrap" }}>
         {[
-          { l:"Total",   v:tasks.length,        c:"#818cf8" },
-          { l:"Active",  v:cnt("in_progress"),  c:"#818cf8" },
-          { l:"Pending", v:cnt("pending"),       c:"#f5a623" },
-          { l:"Done",    v:cnt("completed"),     c:"#34d399" },
-          { l:"Blocked", v:cnt("blocked"),       c:"#f87171" },
-        ].map(s=>(
+          { l:"Total",   v:tasks.length,       c:"#818cf8" },
+          { l:"Active",  v:cnt("in_progress"), c:"#818cf8" },
+          { l:"Pending", v:cnt("pending"),      c:"#f5a623" },
+          { l:"Done",    v:cnt("completed"),    c:"#34d399" },
+          { l:"Blocked", v:cnt("blocked"),      c:"#f87171" },
+        ].map(s => (
           <div key={s.l} style={{ display:"flex", alignItems:"center", gap:8,
             background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.06)",
             borderRadius:9, padding:"7px 14px" }}>
-            <div style={{ fontSize:16, fontWeight:800, color:s.c,
-              fontFamily:"'DM Mono',monospace" }}>{s.v}</div>
+            <div style={{ fontSize:16, fontWeight:800, color:s.c, fontFamily:"'DM Mono',monospace" }}>{s.v}</div>
             <div style={{ fontSize:10, color:"rgba(255,255,255,0.3)", fontWeight:500 }}>{s.l}</div>
           </div>
         ))}
       </div>
 
-      {/* ── Filter tabs ── */}
+      {/* Filter tabs */}
       <div style={{ display:"flex", gap:4, padding:"14px 28px 0", overflowX:"auto" }}>
-        {FILTERS.map(f=>(
-          <button key={f.k} onClick={()=>setFilter(f.k)}
+        {FILTERS.map(f => (
+          <button key={f.k} onClick={() => setFilter(f.k)}
             style={{ padding:"6px 14px", borderRadius:8, fontSize:11, fontWeight:600,
               cursor:"pointer", fontFamily:"'DM Sans',sans-serif", transition:"all .15s",
               whiteSpace:"nowrap", border:"none",
@@ -538,45 +516,42 @@ export default function EmployeeTasks() {
         ))}
       </div>
 
-      {/* ── Main layout ── */}
+      {/* Main layout */}
       <div style={{ flex:1, display:"flex", gap:0, padding:"14px 28px 28px",
         minHeight:0, overflow:"hidden", height:"calc(100vh - 220px)" }}>
 
         {/* LEFT — Task list */}
         <div style={{ width:320, flexShrink:0, overflowY:"auto",
           paddingRight:14, display:"flex", flexDirection:"column", gap:0 }}>
-
           {loading ? (
             <div style={{ textAlign:"center", padding:"60px 0", color:"rgba(255,255,255,0.2)" }}>
-              <div style={{ width:18,height:18,border:"2px solid rgba(255,255,255,0.1)",
-                borderTopColor:"#818cf8",borderRadius:"50%",animation:"spin .8s linear infinite",
+              <div style={{ width:18, height:18, border:"2px solid rgba(255,255,255,0.1)",
+                borderTopColor:"#818cf8", borderRadius:"50%", animation:"spin .8s linear infinite",
                 margin:"0 auto 10px" }}/>
               <div style={{ fontSize:12 }}>Tasks load ho rahe hain...</div>
             </div>
-          ) : filtered.length===0 ? (
-            <div style={{ textAlign:"center", padding:"60px 20px",
-              color:"rgba(255,255,255,0.2)" }}>
+          ) : filtered.length === 0 ? (
+            <div style={{ textAlign:"center", padding:"60px 20px", color:"rgba(255,255,255,0.2)" }}>
               <div style={{ fontSize:32, marginBottom:10 }}>📭</div>
               <div style={{ fontSize:13, fontWeight:600, marginBottom:4 }}>
-                {tasks.length===0?"Koi task nahi":"Koi task nahi mila"}
+                {tasks.length === 0 ? "Koi task nahi" : "Koi task nahi mila"}
               </div>
               <div style={{ fontSize:11 }}>
-                {tasks.length===0?"Admin se task assign karwao":"Filter change karo"}
+                {tasks.length === 0 ? "Admin se task assign karwao" : "Filter change karo"}
               </div>
             </div>
-          ) : filtered.map(task=>(
+          ) : filtered.map(task => (
             <TaskCard
               key={getTaskId(task)}
               task={task}
               onUpdate={updateStatus}
               updating={updating}
-              isSelected={selected===getTaskId(task)}
-              onClick={()=>setSelected(getTaskId(task))}
+              isSelected={selected === getTaskId(task)}
+              onClick={() => setSelected(getTaskId(task))}
             />
           ))}
         </div>
 
-        {/* Divider */}
         <div style={{ width:1, background:"rgba(255,255,255,0.06)", flexShrink:0, marginRight:1 }}/>
 
         {/* RIGHT — Task detail */}
