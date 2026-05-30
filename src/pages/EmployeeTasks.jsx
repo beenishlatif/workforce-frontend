@@ -369,7 +369,7 @@ export default function EmployeeTasks() {
     if (!silent) setLoading(true);
     try {
       let data;
-      try { data = await apiCall("/tasks/mine"); } catch {}
+      try { data = await apiCall("/tasks"); } catch {}
       if (!Array.isArray(data)) {
         const all = await apiCall("/tasks");
         const token  = localStorage.getItem("token");
