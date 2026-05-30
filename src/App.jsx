@@ -47,8 +47,13 @@ import Layout from "./components/Layout";
 // ─────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────
-const API_BASE   = import.meta.env.VITE_BACKEND_URL || "https://workforce-backend-production-cc13.up.railway.app";
-const SOCKET_URL = import.meta.env.VITE_BACKEND_URL || "https://workforce-backend-production-cc13.up.railway.app";
+const API_BASE =
+  import.meta.env.VITE_API_URL ||
+  "https://workforce-backend-production-cc13.up.railway.app";
+
+const SOCKET_URL =
+  import.meta.env.VITE_API_URL ||
+  "https://workforce-backend-production-cc13.up.railway.app";
 
 // ─────────────────────────────────────────────
 // Blocked App Context
