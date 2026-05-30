@@ -10,7 +10,8 @@ import API from "../api/axios.js";
 // ─────────────────────────────────────────────
 // CONFIG
 // ─────────────────────────────────────────────
-const SOCKET_URL = "http://localhost:5000";
+// const SOCKET_URL = "http://localhost:5000";
+const SOCKET_URL = "https://workforce-backend-production-cc13.up.railway.app";
 
 // ─────────────────────────────────────────────
 // RESPONSIVE HOOK  (same as EmployeeList)

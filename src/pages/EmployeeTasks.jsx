@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { io as socketIO } from "socket.io-client";
 
-const API_BASE   = "http://localhost:5000/api";
-const SOCKET_URL = "http://localhost:5000";
+const API_BASE   = "https://workforce-backend-production-cc13.up.railway.app/api";
+const SOCKET_URL = "https://workforce-backend-production-cc13.up.railway.app";
 
 async function apiCall(path, method = "GET", body = null) {
   const token = localStorage.getItem("token");

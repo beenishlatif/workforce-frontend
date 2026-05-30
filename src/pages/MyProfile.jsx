@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { User, Mail, Phone, MapPin, Building2, Briefcase, Calendar, Edit2, Save, X, RefreshCw, Clock, BarChart2, Activity, CheckCircle } from "lucide-react";
 
-const BASE = "http://localhost:5000";
+const BASE = "https://workforce-backend-dusky.vercel.app";
 const prodColor = p=>p>=70?"#4ade80":p>=40?"#fbbf24":"#f87171";
 function fmtMins(m){if(!m||m<=0)return"0m";const h=Math.floor(m/60),mn=m%60;return h===0?`${mn}m`:mn===0?`${h}h`:`${h}h ${mn}m`;}
 const GRADS=["linear-gradient(135deg,#3b82f6,#1d4ed8)","linear-gradient(135deg,#10b981,#065f46)","linear-gradient(135deg,#8b5cf6,#4c1d95)","linear-gradient(135deg,#f59e0b,#92400e)","linear-gradient(135deg,#ec4899,#831843)"];
@@ -81,7 +81,7 @@ export default function MyProfile() {
   const STATUS_C={pending:"#fbbf24",in_progress:"#818cf8",in_review:"#06b6d4",completed:"#4ade80",blocked:"#f87171"};
 
   return (
-    <div style={{background:"#0a0a0f",minHeight:"100vh",padding:"28px 32px",fontFamily:"'Outfit',sans-serif",color:"#fff"}}>
+    <div style={{background:"#0a0a0f",minHeight:"100vh",padding:"clamp(16px,4vw,28px) clamp(12px,4vw,32px)",fontFamily:"'Outfit',sans-serif",color:"#fff"}}>
       <style>{CSS}</style>
 
       {saved&&(
@@ -118,7 +118,7 @@ export default function MyProfile() {
         </div>
       </div>
 
-      <div style={{display:"grid",gridTemplateColumns:"320px 1fr",gap:20,alignItems:"start"}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:20,alignItems:"start"}}>
 
         {/* LEFT */}
         <div style={{display:"flex",flexDirection:"column",gap:16}}>
@@ -161,7 +161,7 @@ export default function MyProfile() {
           {/* Task Summary */}
           <div style={{background:"#0f1117",border:"1px solid #1a1d2e",borderRadius:14,padding:"16px 20px"}}>
             <div style={{fontSize:11,fontWeight:700,opacity:.4,textTransform:"uppercase",letterSpacing:".08em",marginBottom:14}}>Task Summary</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:12}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:10,marginBottom:12}}>
               {[
                 {label:"Total",val:tasks.length,     color:"#818cf8"},
                 {label:"Done", val:doneTasks,         color:"#4ade80"},
@@ -191,7 +191,7 @@ export default function MyProfile() {
         <div style={{display:"flex",flexDirection:"column",gap:16}}>
 
           {/* Today Stats */}
-          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:12}}>
             {[
               {icon:<Clock size={18}/>,    bg:"#3b82f6",label:"Active Today", val:fmtMins(stats.totalMins)},
               {icon:<BarChart2 size={18}/>,bg:"#10b981",label:"Productivity", val:`${stats.avgPct}%`,vc:prodColor(stats.avgPct)},
@@ -209,7 +209,7 @@ export default function MyProfile() {
           {/* Edit / View Info */}
           <div style={{background:"#0f1117",border:"1px solid #1a1d2e",borderRadius:14,padding:"20px 24px"}}>
             <div style={{fontSize:13,fontWeight:700,marginBottom:18}}>{editing?"Edit Information":"Personal Information"}</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:14}}>
               {[
                 {label:"First Name",     key:"firstName"},
                 {label:"Last Name",      key:"lastName"},

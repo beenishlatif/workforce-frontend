@@ -86,7 +86,7 @@ function DetailModal({ record, onClose }) {
               <div style={{fontSize:13,color:"#fff",fontWeight:500}}>{record.activity}</div>
             </div>
           )}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:10}}>
             {[
               {label:"Time",        val:record.time,               icon:<Clock size={13}/>    },
               {label:"Duration",    val:fmtMins(record.duration||1),icon:<Activity size={13}/>},
@@ -167,7 +167,7 @@ export default function ActivityLog() {
   const dateLabel = {today:"Today",yesterday:"Yesterday",week:"This Week",month:"This Month",all:"All Time"}[dateRange];
 
   return (
-    <div style={{background:"#0a0a0f",minHeight:"100vh",padding:"28px 32px",fontFamily:"'Outfit',sans-serif",color:"#fff"}}>
+    <div style={{background:"#0a0a0f",minHeight:"100vh",padding:"clamp(16px,4vw,28px) clamp(12px,4vw,32px)",fontFamily:"'Outfit',sans-serif",color:"#fff"}}>
       <style>{CSS}</style>
       {selRecord && <DetailModal record={selRecord} onClose={()=>setSelRecord(null)}/>}
 
@@ -206,7 +206,7 @@ export default function ActivityLog() {
         </div>
       </div>
 
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:24}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:14,marginBottom:24}}>
         {[
           {icon:<Clock size={18}/>,    bg:"#3b82f6",label:"Active Time",      val:fmtMins(stats.totalMins), sub:dateLabel},
           {icon:<BarChart2 size={18}/>,bg:"#10b981",label:"Avg Productivity", val:`${stats.avgPct}%`,       vc:prodColor(stats.avgPct)},
@@ -288,7 +288,7 @@ export default function ActivityLog() {
         </div>
       ) : (
         <div style={{background:"#0f1117",border:"1px solid #1a1d2e",borderRadius:14,overflow:"hidden"}}>
-          <div style={{display:"grid",gridTemplateColumns:"2.5fr 2fr 1fr 1fr 1.2fr 90px",padding:"11px 20px",
+          <div style={{display:"grid",gridTemplateColumns:"2.5fr 2fr 1fr 1fr 1.2fr 90px",padding:"11px 20px",overflowX:"auto",
             borderBottom:"1px solid #1f2937",background:"rgba(255,255,255,0.02)"}}>
             {["Application","Window / Activity","Duration","Productivity","Category","Time"].map(h=>(
               <div key={h} style={{fontSize:10,opacity:.35,textTransform:"uppercase",letterSpacing:".07em",fontWeight:700}}>{h}</div>

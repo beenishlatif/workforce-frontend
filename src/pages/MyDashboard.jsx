@@ -7,7 +7,7 @@ import {
   User, Shield, TrendingUp
 } from "lucide-react";
 
-const BASE = "http://localhost:5000";
+const BASE = "https://workforce-backend-dusky.vercel.app";
 
 const prodColor = p => p >= 70 ? "#4ade80" : p >= 40 ? "#fbbf24" : "#f87171";
 function fmtMins(m) {
@@ -106,7 +106,7 @@ export default function MyDashboard() {
   };
 
   return (
-    <div style={{background:"#0a0a0f",minHeight:"100vh",padding:"28px 32px",fontFamily:"'Outfit',sans-serif",color:"#fff"}}>
+    <div style={{background:"#0a0a0f",minHeight:"100vh",padding:"clamp(16px,4vw,28px) clamp(12px,4vw,32px)",fontFamily:"'Outfit',sans-serif",color:"#fff"}}>
       <style>{CSS}</style>
 
       {/* ── Greeting Header ── */}
@@ -145,7 +145,7 @@ export default function MyDashboard() {
       </div>
 
       {/* ── 4 Stat Cards ── */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:24}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:14,marginBottom:24}}>
         {[
           { icon:<Clock size={18}/>,       bg:"#3b82f6", label:"Active Today",    val:fmtMins(stats.totalMins),      sub:"tracked time",              link:"/employee/hours"       },
           { icon:<BarChart2 size={18}/>,   bg:"#10b981", label:"Productivity",    val:`${stats.avgPct||0}%`,         vc:prodColor(stats.avgPct||0),   link:"/employee/activity"    },
@@ -178,7 +178,7 @@ export default function MyDashboard() {
       )}
 
       {/* ── Main 2 col ── */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20,marginBottom:20}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:20,marginBottom:20}}>
 
         {/* Recent Activity */}
         <div style={{background:"#0f1117",border:"1px solid #1a1d2e",borderRadius:14,padding:"18px 20px"}}>
@@ -253,7 +253,7 @@ export default function MyDashboard() {
       </div>
 
       {/* ── Bottom 3 col ── */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:20}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:20}}>
 
         {/* Screenshots */}
         <div style={{background:"#0f1117",border:"1px solid #1a1d2e",borderRadius:14,padding:"18px 20px"}}>
@@ -266,7 +266,7 @@ export default function MyDashboard() {
               View all <ChevronRight size={12}/>
             </button>
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:8}}>
             {recentShot.length===0?(
               <div style={{gridColumn:"span 2",textAlign:"center",padding:"20px 0",opacity:.3}}>
                 <Camera size={18} style={{display:"block",margin:"0 auto 6px"}}/>
@@ -378,4 +378,8 @@ const CSS = `
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-track { background: #0a0a0f; }
   ::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 4px; }
+  @media (max-width: 640px) {
+    .dash-header { flex-direction: column !important; align-items: flex-start !important; }
+    .dash-clock  { text-align: left !important; }
+  }
 `;

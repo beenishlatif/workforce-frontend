@@ -9,7 +9,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-const API = "http://localhost:5000/api/monitor";
+// const API = "http://localhost:5000/api/monitor";
+const API = "https://workforce-backend-production-cc13.up.railway.app/api/monitor";
 
 export default function LiveMonitor() {
   const [employees, setEmployees] = useState([]);

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { Camera, RefreshCw, Search, ChevronDown, Shield, ShieldAlert, X, Clock, Calendar, BarChart2, AlertOctagon, ImageIcon, MonitorPlay } from "lucide-react";
 
-const BASE = "http://localhost:5000";
+const BASE = "https://workforce-backend-dusky.vercel.app";
 const prodColor = p => p>=70?"#4ade80":p>=40?"#fbbf24":"#f87171";
 
 function filterDate(arr, range) {
@@ -117,7 +117,7 @@ export default function MyScreenshots() {
   const dateLabel = {all:"All Time",today:"Today",yesterday:"Yesterday",week:"This Week",month:"This Month"}[dateRange];
 
   return (
-    <div style={{background:"#0a0a0f",minHeight:"100vh",padding:"28px 32px",fontFamily:"'Outfit',sans-serif",color:"#fff"}}>
+    <div style={{background:"#0a0a0f",minHeight:"100vh",padding:"clamp(16px,4vw,28px) clamp(12px,4vw,32px)",fontFamily:"'Outfit',sans-serif",color:"#fff"}}>
       <style>{CSS}</style>
       {viewShot && <ViewerModal shot={viewShot} onClose={()=>setViewShot(null)}/>}
 
@@ -158,7 +158,7 @@ export default function MyScreenshots() {
       </div>
 
       {/* Stats Cards */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:24}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:14,marginBottom:24}}>
         {[
           {icon:<ImageIcon size={18}/>,   bg:"#3b82f6",label:"Total",       val:stats.total,    sub:dateLabel},
           {icon:<BarChart2 size={18}/>,   bg:"#10b981",label:"Avg Productivity",val:`${stats.avgProd}%`,vc:prodColor(stats.avgProd)},

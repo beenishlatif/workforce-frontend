@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { Clock, RefreshCw, ChevronDown, TrendingUp, Coffee, Zap, Calendar, BarChart2 } from "lucide-react";
 
-const BASE = "http://localhost:5000";
+const BASE = "https://workforce-backend-dusky.vercel.app";
 const prodColor = p => p>=70?"#4ade80":p>=40?"#fbbf24":"#f87171";
 function fmtMins(m) { if(!m||m<=0)return"0m"; const h=Math.floor(m/60),mn=m%60; return h===0?`${mn}m`:mn===0?`${h}h`:`${h}h ${mn}m`; }
 
@@ -44,7 +44,7 @@ export default function WorkHours() {
   const dateLabel= {today:"Today",yesterday:"Yesterday",week:"This Week",all:"All Time"}[dateRange];
 
   return (
-    <div style={{background:"#0a0a0f",minHeight:"100vh",padding:"28px 32px",fontFamily:"'Outfit',sans-serif",color:"#fff"}}>
+    <div style={{background:"#0a0a0f",minHeight:"100vh",padding:"clamp(16px,4vw,28px) clamp(12px,4vw,32px)",fontFamily:"'Outfit',sans-serif",color:"#fff"}}>
       <style>{CSS}</style>
 
       {/* Header */}
@@ -79,7 +79,7 @@ export default function WorkHours() {
       </div>
 
       {/* Stats Cards */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:24}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:14,marginBottom:24}}>
         {[
           {icon:<Clock size={18}/>,    bg:"#3b82f6",label:"Total Time",      val:fmtMins(stats.totalMins), sub:dateLabel},
           {icon:<Zap size={18}/>,      bg:"#10b981",label:"Work Hours",      val:fmtMins(stats.workMins),  sub:"9AM – 6PM"},
