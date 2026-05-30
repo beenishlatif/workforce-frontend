@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { Camera, RefreshCw, Search, ChevronDown, Shield, ShieldAlert, X, Clock, Calendar, BarChart2, AlertOctagon, ImageIcon, MonitorPlay } from "lucide-react";
 
-const BASE = "https://workforce-backend-dusky.vercel.app";
+const BASE = "https://workforce-backend-production-cc13.up.railway.app";
 const prodColor = p => p>=70?"#4ade80":p>=40?"#fbbf24":"#f87171";
 
 function filterDate(arr, range) {

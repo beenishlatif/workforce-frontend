@@ -7,7 +7,7 @@ import {
 import { io as socketIO } from "socket.io-client";
 import API from "../api/axios.js";
 
-const SOCKET_URL = "https://workforce-backend-dusky.vercel.app";
+const SOCKET_URL = "https://workforce-backend-production-cc13.up.railway.app";
 
 function fmtMins(m) {
   const n = Number(m);

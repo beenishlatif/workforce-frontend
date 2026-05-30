@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { Clock, RefreshCw, ChevronDown, TrendingUp, Coffee, Zap, Calendar, BarChart2 } from "lucide-react";
 
-const BASE = "https://workforce-backend-dusky.vercel.app";
+const BASE = "https://workforce-backend-production-cc13.up.railway.app";
 const prodColor = p => p>=70?"#4ade80":p>=40?"#fbbf24":"#f87171";
 function fmtMins(m) { if(!m||m<=0)return"0m"; const h=Math.floor(m/60),mn=m%60; return h===0?`${mn}m`:mn===0?`${h}h`:`${h}h ${mn}m`; }
 

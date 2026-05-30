@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { User, Mail, Phone, MapPin, Building2, Briefcase, Calendar, Edit2, Save, X, RefreshCw, Clock, BarChart2, Activity, CheckCircle } from "lucide-react";
 
-const BASE = "https://workforce-backend-dusky.vercel.app";
+const BASE = "https://workforce-backend-production-cc13.up.railway.app";
 const prodColor = p=>p>=70?"#4ade80":p>=40?"#fbbf24":"#f87171";
 function fmtMins(m){if(!m||m<=0)return"0m";const h=Math.floor(m/60),mn=m%60;return h===0?`${mn}m`:mn===0?`${h}h`:`${h}h ${mn}m`;}
 const GRADS=["linear-gradient(135deg,#3b82f6,#1d4ed8)","linear-gradient(135deg,#10b981,#065f46)","linear-gradient(135deg,#8b5cf6,#4c1d95)","linear-gradient(135deg,#f59e0b,#92400e)","linear-gradient(135deg,#ec4899,#831843)"];
