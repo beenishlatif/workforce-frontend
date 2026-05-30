@@ -12,13 +12,12 @@ import {
   Route,
   Navigate,
   useLocation,
-  useNavigate,
 } from "react-router-dom";
 import { io } from "socket.io-client";
-import axios from "axios";
 
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { PrivacyProvider } from "./context/PrivacyContext";
+import API from "./api/axios.js"; // ✅ single source of truth — Railway backend
 
 import Login from "./pages/Login";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -45,15 +44,9 @@ import AuthGuard from "./components/AuthGuard";
 import Layout from "./components/Layout";
 
 // ─────────────────────────────────────────────
-// Constants
+// Socket URL — only Railway, never Vercel
 // ─────────────────────────────────────────────
-const API_BASE =
-  import.meta.env.VITE_API_URL ||
-  "https://workforce-backend-production-cc13.up.railway.app";
-
-const SOCKET_URL =
-  import.meta.env.VITE_API_URL ||
-  "https://workforce-backend-production-cc13.up.railway.app";
+const SOCKET_URL = "https://workforce-backend-production-cc13.up.railway.app";
 
 // ─────────────────────────────────────────────
 // Blocked App Context
@@ -67,49 +60,56 @@ export const useBlockedApps = () => useContext(BlockedAppContext);
 function BlockedAppProvider({ children }) {
   const { token, role } = useAuth();
 
-  const [blockedApps, setBlockedApps] = useState([]);
-  const blockedAppsRef = useRef([]);
-
-  const [stats, setStats] = useState({
-    total: 0, active: 0, websites: 0, internal: 0,
-  });
-  const [loading, setLoading] = useState(true);
+  const [blockedApps, setBlockedApps]   = useState([]);
+  const blockedAppsRef                  = useRef([]);
+  const [stats, setStats]               = useState({ total: 0, active: 0, websites: 0, internal: 0 });
+  const [loading, setLoading]           = useState(true);
 
   const updateBlockedApps = useCallback((list) => {
     blockedAppsRef.current = list;
     setBlockedApps(list);
   }, []);
 
-  const api = useCallback(
-    () =>
-      axios.create({
-        baseURL: API_BASE,
-        headers: { Authorization: `Bearer ${token}` },
-      }),
-    [token]
-  );
+  const recalcStats = useCallback((list) => {
+    const active   = list.filter((a) => a.isBlocked).length;
+    const websites = list.filter((a) => a.isBlocked && a.type === "website").length;
+    const internal = list.filter((a) => a.isBlocked && a.type === "internal").length;
+    setStats({ total: list.length, active, websites, internal });
+  }, []);
 
+  // ── Fetch ──────────────────────────────────────────────────────────────
   const fetchApps = useCallback(async () => {
     if (!token) return;
     try {
-      const res = await api().get("/api/blocked-apps");
-      updateBlockedApps(res.data.data || []);
+      // API baseURL is already .../api so path is just /blocked-apps
+      const res = await API.get("/blocked-apps");
+      const list = Array.isArray(res.data)
+        ? res.data
+        : res.data.data || res.data.apps || [];
+      updateBlockedApps(list);
+      recalcStats(list);
     } catch (err) {
       console.error("BlockedApps fetch error:", err);
     } finally {
       setLoading(false);
     }
-  }, [api, token, updateBlockedApps]);
+  }, [token, updateBlockedApps, recalcStats]);
 
   const fetchStats = useCallback(async () => {
     if (!token) return;
     try {
-      const res = await api().get("/api/blocked-apps/stats");
-      setStats(res.data.data || {});
+      const res = await API.get("/blocked-apps/stats");
+      const data = res.data.data || res.data || {};
+      setStats({
+        total:    data.total    ?? 0,
+        active:   data.active   ?? data.blocked ?? 0,
+        websites: data.websites ?? 0,
+        internal: data.internal ?? data.pages   ?? 0,
+      });
     } catch (err) {
       console.error("Stats fetch error:", err);
     }
-  }, [api, token]);
+  }, [token]);
 
   useEffect(() => {
     if (!token) { setLoading(false); return; }
@@ -117,7 +117,7 @@ function BlockedAppProvider({ children }) {
     fetchStats();
   }, [fetchApps, fetchStats, token]);
 
-  // ─── Socket — real-time updates ───────────────────────────────────────
+  // ── Socket — real-time updates ─────────────────────────────────────────
   useEffect(() => {
     if (!token) return;
 
@@ -127,7 +127,6 @@ function BlockedAppProvider({ children }) {
     });
 
     socket.on("connect", () => {
-      console.log("✅ Socket connected:", socket.id);
       socket.emit("join_room", role || "employee");
     });
 
@@ -135,69 +134,66 @@ function BlockedAppProvider({ children }) {
       console.error("❌ Socket error:", err.message);
     });
 
-    // Admin dashboard ke liye — full list update
+    // Full list update from admin dashboard actions
     socket.on("blocked_apps_updated", (list) => {
-      console.log("🔄 blocked_apps_updated:", list.length, "items");
       updateBlockedApps(list);
-      const active   = list.filter((a) => a.isBlocked).length;
-      const websites = list.filter((a) => a.isBlocked && a.type === "website").length;
-      const internal = list.filter((a) => a.isBlocked && a.type === "internal").length;
-      setStats({ total: list.length, active, websites, internal });
+      recalcStats(list);
     });
 
-    // ✅ FIX 1: Browser/mobile/tablet ke liye — domains + routes directly aate hain
-    // Controller iska emit karta hai har block/unblock/delete pe
+    // Browser/mobile direct domain+route list
     socket.on("browser:blockedList", ({ domains, routes }) => {
-      console.log("🔄 browser:blockedList:", domains.length, "domains,", routes.length, "routes");
-
-      // Existing list ke saath merge karo — type preserve karo
-      // Naye blocked domains se blockedApps list update karo
       const updated = blockedAppsRef.current.map((app) => {
         if (app.type === "website") {
-          // Agar domain list mein hai → blocked, nahi hai → unblocked
-          const isNowBlocked = domains.includes(app.identifier);
-          return { ...app, isBlocked: isNowBlocked };
+          return { ...app, isBlocked: domains.includes(app.identifier) };
         }
         if (app.type === "internal") {
-          const isNowBlocked = routes.includes(app.identifier);
-          return { ...app, isBlocked: isNowBlocked };
+          return { ...app, isBlocked: routes.includes(app.identifier) };
         }
         return app;
       });
-
       updateBlockedApps(updated);
-
-      const active   = updated.filter((a) => a.isBlocked).length;
-      const websites = updated.filter((a) => a.isBlocked && a.type === "website").length;
-      const internal = updated.filter((a) => a.isBlocked && a.type === "internal").length;
-      setStats({ total: updated.length, active, websites, internal });
+      recalcStats(updated);
     });
 
     return () => socket.disconnect();
-  }, [token, role, updateBlockedApps]);
+  }, [token, role, updateBlockedApps, recalcStats]);
 
-  // ─── CRUD ─────────────────────────────────────────────────────────────
+  // ── CRUD — all through the shared API instance ─────────────────────────
   const addApp = async (data) => {
-    const res = await api().post("/api/blocked-apps", data);
-    await fetchApps(); await fetchStats();
-    return res.data.data;
+    const res = await API.post("/blocked-apps", data);
+    const newApp = res.data.data || res.data;
+    const updated = [...blockedAppsRef.current, newApp];
+    updateBlockedApps(updated);
+    recalcStats(updated);
+    return newApp;
   };
 
   const toggleApp = async (id) => {
-    const res = await api().patch(`/api/blocked-apps/${id}/toggle`);
-    await fetchApps(); await fetchStats();
-    return res.data.data;
+    const res = await API.patch(`/blocked-apps/${id}/toggle`);
+    const toggled = res.data.data || res.data;
+    const updated = blockedAppsRef.current.map((a) =>
+      a._id === id ? { ...a, ...toggled } : a
+    );
+    updateBlockedApps(updated);
+    recalcStats(updated);
+    return toggled;
   };
 
   const editApp = async (id, data) => {
-    const res = await api().put(`/api/blocked-apps/${id}`, data);
-    await fetchApps();
-    return res.data.data;
+    const res = await API.put(`/blocked-apps/${id}`, data);
+    const edited = res.data.data || res.data;
+    const updated = blockedAppsRef.current.map((a) =>
+      a._id === id ? { ...a, ...edited } : a
+    );
+    updateBlockedApps(updated);
+    return edited;
   };
 
   const deleteApp = async (id) => {
-    await api().delete(`/api/blocked-apps/${id}`);
-    await fetchApps(); await fetchStats();
+    await API.delete(`/blocked-apps/${id}`);
+    const updated = blockedAppsRef.current.filter((a) => a._id !== id);
+    updateBlockedApps(updated);
+    recalcStats(updated);
   };
 
   const checkIsBlocked = useCallback((pathOrIdentifier) => {
@@ -229,7 +225,7 @@ function BlockedAppProvider({ children }) {
 }
 
 // ─────────────────────────────────────────────
-// BlockScreen — jab koi route block ho
+// BlockScreen
 // ─────────────────────────────────────────────
 function BlockScreen({ app }) {
   return (
@@ -269,26 +265,17 @@ function BlockScreen({ app }) {
           <path d="M7 11V7a5 5 0 0 1 10 0v4" />
         </svg>
       </div>
-
-      <h2
-        style={{
-          color: "#f87171", fontSize: 22, fontWeight: 800,
-          margin: 0, letterSpacing: "-0.02em",
-        }}
-      >
+      <h2 style={{ color: "#f87171", fontSize: 22, fontWeight: 800, margin: 0, letterSpacing: "-0.02em" }}>
         Access Blocked
       </h2>
-
       <p style={{ color: "#6b6b78", fontSize: 13, margin: 0, textAlign: "center", maxWidth: 320 }}>
-        <strong style={{ color: "#c4c4cc" }}>"{app.name}"</strong> ko
-        administrator ne block kar diya hai.
+        <strong style={{ color: "#c4c4cc" }}>"{app.name}"</strong> ko administrator ne block kar diya hai.
         {app.reason && (
           <span style={{ display: "block", marginTop: 6, color: "#4a4a55" }}>
             Reason: {app.reason}
           </span>
         )}
       </p>
-
       <p style={{ color: "#3a3a42", fontSize: 11, marginTop: 16, textAlign: "center" }}>
         Agar galti lagti hai toh apne admin se contact karo.
       </p>
@@ -300,69 +287,50 @@ function BlockScreen({ app }) {
 // BlockGuard
 // ─────────────────────────────────────────────
 function BlockGuard({ children }) {
-  const { role } = useAuth();
+  const { role }                        = useAuth();
   const { blockedAppsRef, loading, blockedApps } = useBlockedApps();
-  const location = useLocation();
+  const location                        = useLocation();
 
   const getBlockedApp = useCallback(() => {
-    // Admin kabhi block nahi hoga
     if (role === "admin") return null;
 
     const currentPath = location.pathname;
     const list = blockedAppsRef.current;
 
-    return list.find((app) => {
-      if (!app.isBlocked) return false;
+    return (
+      list.find((app) => {
+        if (!app.isBlocked) return false;
 
-      if (app.type === "internal") {
-        // ✅ Exact startsWith — "/employee/screenshots" → block
-        return currentPath.startsWith(app.identifier);
-      }
-
-      if (app.type === "website") {
-        // ✅ FIX 2: Website type ke liye 3 cheezein check karo:
-
-        // 1. Actual hostname — agar employee kisi aur device se actual site pe gaya
-        //    e.g. youtube.com pe open kiya
-        const cleanIdentifier = app.identifier.toLowerCase().replace(/^www\./, "");
-        const currentHostname = window.location.hostname.toLowerCase().replace(/^www\./, "");
-        if (currentHostname === cleanIdentifier || currentHostname.endsWith(`.${cleanIdentifier}`)) {
-          return true;
+        if (app.type === "internal") {
+          return currentPath.startsWith(app.identifier);
         }
 
-        // 2. Route path mein identifier match — agar koi /youtube ya /youtube.com route ban jaye
-        //    (future-proof, abhi kaam nahi aata lekin edge case cover karta hai)
-        if (currentPath.toLowerCase().includes(cleanIdentifier.split(".")[0])) {
-          // Sirf agar identifier genuinely route se milta ho
-          // Bahut short identifiers (2 char se kam) ko skip karo — false positives
-          const keyword = cleanIdentifier.split(".")[0];
-          if (keyword.length > 3 && currentPath.toLowerCase().includes(`/${keyword}`)) {
-            return true;
-          }
-        }
+        if (app.type === "website") {
+          const cleanId   = app.identifier.toLowerCase().replace(/^www\./, "");
+          const hostname  = window.location.hostname.toLowerCase().replace(/^www\./, "");
+          if (hostname === cleanId || hostname.endsWith(`.${cleanId}`)) return true;
 
-        // 3. ✅ MOBILE/TABLET KEY FIX:
-        // Agar app localhost pe nahi chal raha (production deploy) toh
-        // referrer ya current URL se domain match karo
-        const fullUrl = window.location.href.toLowerCase();
-        if (fullUrl.includes(cleanIdentifier)) return true;
+          const keyword = cleanId.split(".")[0];
+          if (keyword.length > 3 && currentPath.toLowerCase().includes(`/${keyword}`)) return true;
+
+          if (window.location.href.toLowerCase().includes(cleanId)) return true;
+
+          return false;
+        }
 
         return false;
-      }
-
-      return false;
-    }) || null;
+      }) || null
+    );
   }, [role, location.pathname, blockedAppsRef]);
 
   const [blockedApp, setBlockedApp] = useState(null);
 
   useEffect(() => {
     if (loading) return;
-    const found = getBlockedApp();
-    setBlockedApp(found);
+    setBlockedApp(getBlockedApp());
   }, [location.pathname, blockedApps, loading, getBlockedApp]);
 
-  if (loading) return children;
+  if (loading)    return children;
   if (blockedApp) return <BlockScreen app={blockedApp} />;
   return children;
 }
@@ -370,7 +338,7 @@ function BlockGuard({ children }) {
 // ─────────────────────────────────────────────
 function RoleRedirect() {
   const { role } = useAuth();
-  if (role === "admin")    return <Navigate to="/hr-dashboard" replace />;
+  if (role === "admin")    return <Navigate to="/hr-dashboard"       replace />;
   if (role === "employee") return <Navigate to="/employee/dashboard" replace />;
   return <Navigate to="/login" replace />;
 }
@@ -389,18 +357,18 @@ function AppRoutes() {
         <Route path="/redirect"        element={<RoleRedirect />} />
 
         {/* ─── ADMIN ─── */}
-        <Route path="/hr-dashboard"           element={<AuthGuard role="admin"><Layout><HROverview /></Layout></AuthGuard>} />
-        <Route path="/admin/employees"        element={<AuthGuard role="admin"><Layout><EmployeeManagement /></Layout></AuthGuard>} />
-        <Route path="/admin/employees/add"    element={<AuthGuard role="admin"><Layout><AddEmployee /></Layout></AuthGuard>} />
-        <Route path="/admin/employees/list"   element={<AuthGuard role="admin"><Layout><EmployeeList /></Layout></AuthGuard>} />
-        <Route path="/admin/tasks"            element={<AuthGuard role="admin"><Layout><TaskManagement /></Layout></AuthGuard>} />
-        <Route path="/admin/monitor"          element={<AuthGuard role="admin"><Layout><LiveMonitor /></Layout></AuthGuard>} />
-        <Route path="/admin/screenshots"      element={<AuthGuard role="admin"><Layout><AllScreenshots /></Layout></AuthGuard>} />
-        <Route path="/admin/activity"         element={<AuthGuard role="admin"><Layout><AdminActivityLogs /></Layout></AuthGuard>} />
-        <Route path="/admin/alerts"           element={<AuthGuard role="admin"><Layout><AlertsRules /></Layout></AuthGuard>} />
-        <Route path="/admin/reports"          element={<AuthGuard role="admin"><Layout><ReportsGenerator /></Layout></AuthGuard>} />
-        <Route path="/admin/analytics"        element={<AuthGuard role="admin"><Layout><AnalyticsTrends /></Layout></AuthGuard>} />
-        <Route path="/admin/settings"         element={<AuthGuard role="admin"><Layout><SystemSettings /></Layout></AuthGuard>} />
+        <Route path="/hr-dashboard"         element={<AuthGuard role="admin"><Layout><HROverview /></Layout></AuthGuard>} />
+        <Route path="/admin/employees"      element={<AuthGuard role="admin"><Layout><EmployeeManagement /></Layout></AuthGuard>} />
+        <Route path="/admin/employees/add"  element={<AuthGuard role="admin"><Layout><AddEmployee /></Layout></AuthGuard>} />
+        <Route path="/admin/employees/list" element={<AuthGuard role="admin"><Layout><EmployeeList /></Layout></AuthGuard>} />
+        <Route path="/admin/tasks"          element={<AuthGuard role="admin"><Layout><TaskManagement /></Layout></AuthGuard>} />
+        <Route path="/admin/monitor"        element={<AuthGuard role="admin"><Layout><LiveMonitor /></Layout></AuthGuard>} />
+        <Route path="/admin/screenshots"    element={<AuthGuard role="admin"><Layout><AllScreenshots /></Layout></AuthGuard>} />
+        <Route path="/admin/activity"       element={<AuthGuard role="admin"><Layout><AdminActivityLogs /></Layout></AuthGuard>} />
+        <Route path="/admin/alerts"         element={<AuthGuard role="admin"><Layout><AlertsRules /></Layout></AuthGuard>} />
+        <Route path="/admin/reports"        element={<AuthGuard role="admin"><Layout><ReportsGenerator /></Layout></AuthGuard>} />
+        <Route path="/admin/analytics"      element={<AuthGuard role="admin"><Layout><AnalyticsTrends /></Layout></AuthGuard>} />
+        <Route path="/admin/settings"       element={<AuthGuard role="admin"><Layout><SystemSettings /></Layout></AuthGuard>} />
 
         {/* ─── EMPLOYEE ─── */}
         <Route path="/employee/dashboard"   element={<AuthGuard role="employee"><Layout><MyDashboard /></Layout></AuthGuard>} />
@@ -412,7 +380,7 @@ function AppRoutes() {
         <Route path="/employee/privacy"     element={<AuthGuard role="employee"><Layout><PrivacySettings /></Layout></AuthGuard>} />
 
         {/* LEGACY */}
-        <Route path="/admin/dashboard" element={<Navigate to="/hr-dashboard" replace />} />
+        <Route path="/admin/dashboard" element={<Navigate to="/hr-dashboard"       replace />} />
         <Route path="/dashboard"       element={<Navigate to="/employee/dashboard" replace />} />
 
         {/* 404 */}
